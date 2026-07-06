@@ -47,6 +47,16 @@
     function p(n) { return ('0' + n).slice(-2); }
     return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
   }
+
+  // テキストをファイル名に使える形へ（日本語は保持・記号や空白は_・最大16字）
+  function slugText(s) {
+    return (s || '').replace(/[\s\/\\:*?"<>|.]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 16) || 'telop';
+  }
+  // 書き出しごとに固有のPNG連番ベース名（複数テロップをPremiereで別クリップとして読み込むため）
+  function pngBase(scene) {
+    var rnd = Math.random().toString(36).slice(2, 6);
+    return slugText(scene && scene.text && scene.text.content) + '_' + stamp() + '_' + rnd;
+  }
   function download(data, mime, filename) {
     var blob = (data instanceof Blob) ? data : new Blob([data], { type: mime });
     var url = URL.createObjectURL(blob);
@@ -297,16 +307,19 @@
         if (st.format === 'png') {
           p.set('zipを作成中…', 0.8);
           var zw = TS.exportZip.create();
+          var pbase = pngBase(scene);   // ★書き出しごとに固有。複数テロップが別クリップになる
           return Promise.all(res.frames.map(function (b) { return b.arrayBuffer(); })).then(function (bufs) {
             bufs.forEach(function (ab, i) {
-              zw.add('frames/f' + ('0000' + i).slice(-4) + '.png', new Uint8Array(ab));
+              zw.add(pbase + '/' + pbase + '_' + ('0000' + i).slice(-4) + '.png', new Uint8Array(ab));
             });
-            zw.add('README.txt', new TextEncoder().encode(
+            zw.add(pbase + '/README.txt', new TextEncoder().encode(
               'Telopra PNG連番書き出し\n' +
+              'テキスト: ' + ((scene.text && scene.text.content) || '') + '\n' +
               res.width + 'x' + res.height + ' / ' + res.fps + 'fps / ' + res.count + 'frames (アルファ付き)\n' +
-              'Premiere: ファイル→読み込み→f0000.pngを選択し「画像シーケンス」にチェック\n'));
+              'Premiere: ファイル→読み込み→ ' + pbase + '_0000.png を選択し「画像シーケンス」にチェック\n' +
+              '※フォルダ名・ファイル名は書き出しごとに固有。複数テロップを別クリップとして重ねられます\n'));
             var zip = zw.finish();
-            var size = download(zip, 'application/zip', name + '_png.zip');
+            var size = download(zip, 'application/zip', pbase + '.zip');
             finish('PNG連番zipをダウンロードしました（' + fmtBytes(size) + '）');
           });
         }
