@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#F7F8FC">
+<title>Telopra — モーション付きテロップジェネレーター</title>
+<meta name="description" content="打ち込んだテキストから、高品質でモーション付きのテロップを作成。透過mov・WebM・GIF・Lottieで書き出せるテロップ作成ツール。">
+<meta property="og:title" content="Telopra">
+<meta property="og:description" content="打ち込んだテキストから、モーション付きの高品質テロップを作成・書き出しできるツール">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/ogp.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<!-- UI用フォントのみ静的読込。テロップ用フォントは TS.fonts.injectLink() がJSで注入する -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600&family=Playfair+Display:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<!-- 初期タブは text（制作フロー: テキスト→プリセット→デザイン→モーション）。切替は body[data-active-tab] のみ -->
+<body data-active-tab="text">
+
+<div class="app-shell">
+
+  <!-- ヘッダー: 左=ロゴ / 右=Undo・Redo・書き出し -->
+  <header class="hero" id="tsHeader">
+    <div class="logo-block">
+      <h1 class="logo"><img src="assets/logo.svg" alt="Telopra" class="logo-img"></h1>
+    </div>
+    <div class="hero-actions">
+      <button class="hero-icon-btn" id="tsUndo" type="button" aria-label="元に戻す" title="元に戻す" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+      </button>
+      <button class="hero-icon-btn" id="tsRedo" type="button" aria-label="やり直す" title="やり直す" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+      </button>
+      <button class="hero-export-btn" id="tsExport" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>書き出し</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="editor-columns">
+    <div class="editor-left">
+      <!-- プレビュー（中身は TS.uiPreview が mount） -->
+      <section class="preview-section" id="tsPreviewSection" aria-label="プレビュー"></section>
+    </div>
+    <div class="editor-right">
+      <!-- PC用フェーズ切替セグメント（中身は app.js が mount。モバイルでは非表示） -->
+      <div class="phase-switch" id="tsPhaseSwitch" aria-label="編集タブ切替"></div>
+      <!-- 各パネル（中身は各 panel-* が mount。空のまま置く） -->
+      <section class="panel-section" id="tsPanelText" data-tab-content="text" aria-label="テキスト"></section>
+      <section class="panel-section" id="tsPanelDesign" data-tab-content="design" aria-label="デザイン"></section>
+      <section class="panel-section" id="tsPanelPresets" data-tab-content="presets" aria-label="プリセット"></section>
+      <section class="panel-section" id="tsPanelMotion" data-tab-content="motion" aria-label="モーション"></section>
+      <section class="panel-section" id="tsPanelMy" data-tab-content="my" aria-label="Myプリセット"></section>
+    </div>
+  </div>
+
+</div>
+
+<!-- 下端固定タブバー（モバイル/タブレット。PCは phase-switch に役割を渡す） -->
+<nav class="tab-bar" id="tsTabBar" role="tablist" aria-label="セクション切替">
+  <button class="tab-btn active" type="button" role="tab" data-tab="text" aria-selected="true">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+    <span class="tab-label">テキスト</span>
+  </button>
+  <button class="tab-btn" type="button" role="tab" data-tab="presets" aria-selected="false">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    <span class="tab-label">プリセット</span>
+  </button>
+  <button class="tab-btn" type="button" role="tab" data-tab="design" aria-selected="false">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    <span class="tab-label">デザイン</span>
+  </button>
+  <button class="tab-btn" type="button" role="tab" data-tab="motion" aria-selected="false">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+    <span class="tab-label">モーション</span>
+  </button>
+  <button class="tab-btn" type="button" role="tab" data-tab="my" aria-selected="false">
+    <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span class="tab-label">Myプリセット</span>
+  </button>
+</nav>
+
+<noscript>
+  <div class="noscript-note">Telopra の動作には JavaScript が必要です。ブラウザの設定で JavaScript を有効にしてください。</div>
+</noscript>
+
+<!-- 読込順は ARCHITECTURE.md §6 の契約どおり（変更禁止） -->
+<script src="js/color.js"></script>
+<script src="js/anim.js"></script>
+<script src="js/motion.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/store.js"></script>
+<script src="js/data/fonts.js"></script>
+<script src="js/data/presets.js"></script>
+<script src="js/data/motion-presets.js"></script>
+<script src="js/render-dom.js"></script>
+<script src="js/render-canvas.js"></script>
+<script src="js/ui/controls.js"></script>
+<script src="js/ui/preview.js"></script>
+<script src="js/ui/panel-text.js"></script>
+<script src="js/ui/panel-design.js"></script>
+<script src="js/ui/panel-presets.js"></script>
+<script src="js/ui/panel-motion.js"></script>
+<script src="js/ui/panel-my.js"></script>
+<!-- P1 書き出し（ffmpeg.wasm は全ローカル同梱。ライセンスは vendor/ffmpeg/NOTICE.md） -->
+<script src="vendor/ffmpeg/ffmpeg.js"></script>
+<script src="js/export/zip.js"></script>
+<script src="js/export/gif.js"></script>
+<script src="js/export/frames.js"></script>
+<script src="js/export/movie.js"></script>
+<script src="js/export/css.js"></script>
+<script src="js/export/lottie.js"></script>
+<script src="js/ui/export-modal.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

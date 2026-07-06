@@ -1,0 +1,1017 @@
+@charset "UTF-8";
+/* ============================================================
+   Telopra — app.css
+   UI作法はNOIRU由来だが、カラーはTelopraカラーシステム（Brand Ink/Primary Blue/Signal Cyan/Telop Yellow）。
+   構造変化は 899px/900px、密度調整は 640px（NOIRU_NOTES §6）。
+   ============================================================ */
+
+/* ---------- 1. デザイントークン ---------- */
+html {
+  background-color: #F7F8FC;
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+:root {
+  color-scheme: light;
+  /* ===== Telopra カラーシステム =====
+     信頼感のある濃紺（Brand Ink）＋操作のPrimary Blue＋精密さのSignal Cyan＋
+     テロップらしいTelop Yellow。UIは白基調80%・Blue15%・Cyan/Yellow5%の比率で運用する。 */
+  /* Brand */
+  --brand-ink: #1E1E40;
+  --primary-blue: #3451FF;
+  --deep-blue: #263BC8;
+  --signal-cyan: #00D5FF;
+  --telop-yellow: #FFD84D;
+
+  /* Base */
+  --app-bg: #F7F8FC;
+  --bg: var(--app-bg);              /* 既存参照の互換名 */
+  --surface: #FFFFFF;
+  --surface-2: #F1F4F9;
+  --surface-hover: #F8FBFF;
+  --border: #DFE5EF;
+  --border-soft: #EDF1F7;
+  --soft-blue-bg: #EEF2FF;
+
+  /* Semantic（操作色。既存コンポーネントはこの名前を参照している） */
+  --accent: var(--primary-blue);
+  --accent-strong: var(--deep-blue);
+  --accent-soft: #9FB0FF;
+  --accent-softer: var(--soft-blue-bg);
+  --focus: var(--signal-cyan);
+  --focus-ring: rgba(0, 213, 255, 0.18);
+  --warning: var(--telop-yellow);
+  --danger: #C84444;
+
+  /* Text */
+  --text: var(--brand-ink);
+  --text-muted: #687086;
+  --text-dim: #A5ADBD;
+
+  --radius-xl: 24px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 1px 2px rgba(30, 30, 64, 0.03), 0 2px 8px rgba(30, 30, 64, 0.04);
+  --shadow-card: 0 2px 12px rgba(30, 30, 64, 0.05);
+  --shadow-cta: 0 6px 20px rgba(52, 81, 255, 0.32);
+
+  --easing: cubic-bezier(0.4, 0.0, 0.2, 1);
+
+  /* レイアウト */
+  --shell-gap: 22px;
+  --shell-gap-mobile: 18px;
+  --ba-preview-gap: 4px;
+}
+
+/* ---------- 2. ベース ---------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  min-height: 100dvh;
+  font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  color: var(--text);
+  line-height: 1.5;
+  overscroll-behavior: none;
+}
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 800px 500px at 100% 0%, rgba(52, 81, 255, 0.045), transparent 60%),
+    radial-gradient(ellipse 700px 600px at 0% 100%, rgba(0, 213, 255, 0.035), transparent 65%);
+  overflow-x: hidden;
+}
+button, input, textarea { font-family: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; }
+svg { flex-shrink: 0; }
+
+/* フォーカスの床: outline は消さず accent の可視リングに統一 */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.hidden { display: none !important; }
+
+/* ---------- 3. アプリシェル ---------- */
+.app-shell {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  padding: 24px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--shell-gap);
+}
+/* モバイルでは editor 階層を透過させ、preview-section を shell 直下扱いにする
+   （sticky の当たり判定を shell 全体にするため） */
+.editor-columns, .editor-left, .editor-right { display: contents; }
+
+@media (min-width: 900px) {
+  /* PCは流動レイアウト: プレビュー列(1fr)が窓幅に追随して伸縮（P4レビュー反映）。
+     旧: max-width 980px 固定 → 900px以上で「サイズを変えても何も動かない」ように見えた */
+  .app-shell { max-width: min(1680px, 100%); gap: 20px; padding-left: 28px; padding-right: 28px; }
+  .editor-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 16px 32px;
+    align-items: flex-start;
+  }
+  .editor-left {
+    display: flex; flex-direction: column; gap: 16px; min-width: 0;
+    position: sticky; top: 16px; align-self: start;   /* 左=プレビューが追随 */
+  }
+  .editor-right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+}
+@media (min-width: 1400px) {
+  .editor-columns { grid-template-columns: minmax(0, 1fr) 400px; gap: 16px 40px; }  /* 広い画面ではパネルも少し余裕を */
+}
+
+/* ---------- 4. ヘッダー（ロゴ + Undo/Redo） ---------- */
+.hero {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 2px 0; gap: 12px;
+}
+.logo-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.logo {
+  font-family: 'Playfair Display', 'Noto Serif JP', Georgia, serif;
+  font-weight: 500; font-size: 22px; line-height: 1;
+  letter-spacing: 0.04em; color: var(--brand-ink); white-space: nowrap;
+}
+.hero-actions { display: flex; gap: 8px; }
+.hero-icon-btn {
+  position: relative;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  color: var(--text-muted); border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-soft);
+  transition: all 0.2s var(--easing);
+}
+.hero-icon-btn svg { width: 16px; height: 16px; }
+.hero-icon-btn::after { content: ''; position: absolute; inset: -6px; } /* 44pxタップ確保 */
+.hero-icon-btn:active:not(:disabled) { transform: scale(0.94); }
+.hero-icon-btn:disabled { opacity: 0.35; box-shadow: none; }
+
+/* ---------- 5. プレビュー ---------- */
+.preview-section { position: relative; }
+.preview-wrap {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: var(--surface);
+}
+/* .stage は scene.canvas のアスペクト箱（比率は JS が inline で上書き） */
+.stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  max-height: 62vh;         /* aspect-ratio 経由で幅にも伝播する */
+  margin: 0 auto;
+  overflow: hidden;
+}
+.stage canvas { display: block; }
+
+/* 背景（透過チェッカー16px / 黒 / 白 / グレー。任意色・画像は JS が inline 指定） */
+.stage-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+}
+.stage-bg--checker {
+  background: repeating-conic-gradient(#E9EBF0 0% 25%, #FFFFFF 0% 50%);
+  background-size: 32px 32px;   /* 1マス16px */
+}
+.stage-bg--black { background: #000000; }
+.stage-bg--white { background: #FFFFFF; }
+.stage-bg--gray  { background: #808080; }
+
+/* セーフエリアガイド（80% / 90%枠 + 中心十字）。difference で背景を選ばない */
+.stage-guides {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  mix-blend-mode: difference;
+  background:
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) center / 100% 1px no-repeat,
+    linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)) center / 1px 100% no-repeat;
+}
+.stage-guides::before {
+  content: ''; position: absolute; inset: 10%;               /* 80%枠 */
+  border: 1px solid rgba(255,255,255,0.75);
+}
+.stage-guides::after {
+  content: ''; position: absolute; inset: 5%;                /* 90%枠 */
+  border: 1px dashed rgba(255,255,255,0.45);
+}
+
+/* プレビュー下の操作列（表示切替セグメント・背景チップなどを JS が並べる） */
+.preview-toolbar {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; flex-wrap: wrap; margin-top: 10px;
+}
+
+/* ---------- 6. テロップ構造の静的CSS（ARCHITECTURE §6.5） ---------- */
+.tl-wrap { display: inline-block; }
+.tl-metal {
+  position: relative; display: inline-block;
+  line-height: 1;               /* JS が上書き */
+  color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+.tl-sizer {
+  position: relative; display: block;
+  color: transparent; pointer-events: none;
+}
+.tl-layer {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: block;
+}
+.tl-line { display: block; }
+
+/* ---------- 7. パネル ---------- */
+.panel-section {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 16px 14px 18px;
+  min-width: 0;
+}
+/* タブ切替: body[data-active-tab] のパネルのみ表示（全ビューポート共通） */
+[data-tab-content] { display: none; }
+body[data-active-tab="text"]    [data-tab-content="text"],
+body[data-active-tab="design"]  [data-tab-content="design"],
+body[data-active-tab="presets"] [data-tab-content="presets"],
+body[data-active-tab="motion"]  [data-tab-content="motion"],
+body[data-active-tab="my"]      [data-tab-content="my"] { display: block; }
+
+/* PC用フェーズ切替（モバイルでは非表示。中身は option-group を JS が入れる） */
+.phase-switch { display: none; }
+@media (min-width: 900px) {
+  .phase-switch { display: block; }
+}
+
+.section-title {
+  font-size: 14px; font-weight: 500; color: var(--brand-ink);
+  margin-bottom: 12px; letter-spacing: 0.02em;
+}
+.section-title-count {
+  margin-left: 8px; font-size: 11px; font-weight: 400;
+  color: var(--text-muted); letter-spacing: 0.05em;
+}
+.section-title-count::before { content: '・'; opacity: 0.6; }
+
+/* ---------- 8. 下端タブバー（NOIRU §3） ---------- */
+.tab-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+  display: flex; align-items: stretch; justify-content: space-around;
+  background: var(--surface);
+  border-top: 1px solid var(--border-soft);
+  box-shadow: 0 -4px 20px rgba(30, 30, 64, 0.06);
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.tab-btn {
+  position: relative;
+  flex: 1 1 0; min-width: 0;
+  display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 4px;
+  background: transparent; border: none;
+  color: var(--text-muted);
+  font-size: 9px; font-weight: 500; letter-spacing: 0.04em;
+  transition: color 0.18s var(--easing);
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn.active { color: var(--accent); }        /* 背景は塗らない（NOIRU作法） */
+.tab-icon { width: 19px; height: 19px; transition: transform 0.18s var(--easing); }
+.tab-btn.active .tab-icon { transform: translateY(-1px); }
+.tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tab-btn:disabled { color: var(--text-dim); opacity: 0.6; }
+.tab-btn:disabled .tab-icon { transform: none; }
+.tab-badge {
+  position: absolute; top: 2px; left: 50%; margin-left: 8px;
+  padding: 1px 4px;
+  background: var(--border); color: var(--text-muted);
+  font-size: 7.5px; font-weight: 600; letter-spacing: 0.05em; line-height: 1.4;
+  border-radius: 4px;
+}
+@media (min-width: 900px) {
+  .tab-bar { display: none; }                     /* PCは phase-switch が担当 */
+}
+
+/* ---------- 9. tuning-group（折りたたみ） ---------- */
+.tuning-group { border-top: 1px solid var(--border-soft); }
+.tuning-group:last-child { border-bottom: 1px solid var(--border-soft); }
+.tuning-group-head {
+  width: 100%; background: transparent; border: none;
+  padding: 14px 2px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 500; color: var(--brand-ink);
+  letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent;
+}
+.tuning-group-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.tuning-group-icon { width: 15px; height: 15px; color: var(--text-muted); }
+.tuning-group.open .tuning-group-icon { color: var(--accent); }
+.tuning-group-head-right { display: inline-flex; align-items: center; gap: 4px; }
+.tuning-group-close-label { font-size: 11px; display: none; }
+.tuning-group.open .tuning-group-close-label { display: inline; color: var(--accent); }
+.tuning-group-chevron {
+  width: 17px; height: 17px; color: var(--text-muted);
+  transition: transform 0.25s var(--easing);
+}
+.tuning-group.open .tuning-group-chevron { transform: rotate(180deg); color: var(--accent); }
+.tuning-group-body {
+  max-height: 0; overflow: hidden; padding: 0 2px;
+  transition: max-height 0.3s var(--easing), padding 0.3s var(--easing);
+}
+.tuning-group.open .tuning-group-body {
+  max-height: 900px; padding: 8px 10px 12px;
+  border-top: 1px dashed var(--border-soft);
+  background: var(--surface-2);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  margin: 0 -6px;
+}
+/* 準備中グループ（disabled + バッジ、シェブロンなし） */
+.tuning-group-coming-soon .tuning-group-head { color: var(--text-dim); }
+.coming-soon-badge {
+  margin-left: 8px; padding: 1px 6px;
+  font-size: 9px; font-weight: 500; letter-spacing: 0.05em;
+  background: var(--border); color: var(--text-muted);
+  border-radius: 4px;
+}
+
+/* ---------- 10. スライダー行（契約 §6.10: icon|label|range|value の4列） ---------- */
+.slider-row {
+  display: grid;
+  grid-template-columns: 20px 100px 1fr 44px;
+  gap: 6px; align-items: center;
+  padding: 9px 0;
+}
+.slider-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+}
+.slider-icon svg { width: 16px; height: 16px; }
+.slider-label {
+  font-size: 11.5px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.slider-value {
+  font-size: 11px; color: var(--text-muted); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* 数値ダブルクリック時の直接入力欄（TS.ui が差し込む） */
+.slider-value-input {
+  width: 44px; padding: 1px 3px;
+  font: inherit; font-size: 11px; text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--accent-soft); border-radius: 4px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 22px;         /* 見かけより高くタップ確保 */
+  background: transparent; cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px; background: var(--border); border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(52, 81, 255, 0.30);
+  margin-top: -6.5px;                /* thumb16/2 - track3/2 */
+}
+input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); background: var(--accent-softer); }
+input[type="range"]::-moz-range-track {
+  height: 3px; background: var(--border); border-radius: 2px;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px;
+  background: #fff; border: 1.5px solid var(--accent); border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(52, 81, 255, 0.30);
+}
+input[type="range"]:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- 11. セグメント / トグル（select不使用） ---------- */
+.option-group {
+  display: flex; gap: 6px; margin: 6px 0;
+  grid-column: 1 / -1;               /* slider-row 内では全幅落ち */
+}
+.option-btn {
+  position: relative;
+  flex: 1; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 11px; padding: 7px 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s var(--easing);
+  -webkit-tap-highlight-color: transparent;
+}
+.option-btn:not(.motion-color-btn)::after {
+  content: ''; position: absolute; inset: -6px 0;   /* 縦方向のみタップ水増し */
+}
+.option-btn.active {
+  background: var(--accent-softer); color: var(--accent);
+  border-color: var(--accent-soft);
+  box-shadow: 0 1px 2px rgba(52, 81, 255, 0.12);
+}
+.option-btn:disabled { opacity: 0.45; }
+/* チェックボックス風トグル（::before=角丸四角 / active時 ::after=白✓） */
+.motion-color-btn { padding-left: 18px; }
+.motion-color-btn::before {
+  content: ''; position: absolute; left: 5px; top: 50%;
+  transform: translateY(-50%);
+  width: 10px; height: 10px;
+  border: 1.3px solid var(--text-muted); border-radius: 2px;
+}
+.motion-color-btn.active::before { background: var(--accent); border-color: var(--accent); }
+.motion-color-btn.active::after {
+  content: ''; position: absolute; left: 7px; top: 50%;
+  width: 3px; height: 6px;
+  border-right: 1.8px solid #fff; border-bottom: 1.8px solid #fff;
+  transform: translateY(-70%) rotate(45deg);
+}
+
+/* ピル型セグメント（表示切替 [DOM|Canvas|差分] などに使用） */
+.ba-toggle {
+  display: flex; padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.ba-btn {
+  position: relative;
+  background: transparent; border: none;
+  padding: 6px 20px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  transition: all 0.2s var(--easing);
+  -webkit-tap-highlight-color: transparent;
+}
+.ba-btn::after { content: ''; position: absolute; inset: -8px 0; }  /* タップ水増し */
+.ba-btn.active { background: var(--accent); color: #fff; }
+
+/* ---------- 12. カラー入力（.color-swatch + hex） ---------- */
+.color-input { display: inline-flex; align-items: center; gap: 8px; }
+.color-swatch {
+  position: relative;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.color-swatch input[type="color"] {
+  position: absolute; inset: -6px;           /* 既定枠を外へ逃がして面一に */
+  width: calc(100% + 12px); height: calc(100% + 12px);
+  border: none; padding: 0; background: none; cursor: pointer;
+}
+.color-hex {
+  width: 84px;
+  font-size: 12px; letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  padding: 7px 8px;
+}
+
+/* ---------- 13. テキスト系入力の床 ---------- */
+input[type="text"], input[type="search"], textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 13px; color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+textarea { min-height: 72px; resize: vertical; line-height: 1.6; }
+input:disabled, textarea:disabled { opacity: 0.5; background: var(--surface-2); cursor: not-allowed; }
+::placeholder { color: var(--text-dim); }
+
+/* ---------- 14. プリセットグリッド ---------- */
+.presets-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 14px 10px;
+}
+.preset {
+  background: transparent; border: none;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 0;
+  transition: transform 0.2s var(--easing);
+  -webkit-tap-highlight-color: transparent;
+}
+.preset:active { transform: scale(0.96); }
+.preset-thumb {
+  width: 100%; aspect-ratio: 16 / 10;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, #454A56, #23262D);  /* 明色テロップが読める暗地 */
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s var(--easing);
+}
+.preset.active .preset-thumb { border-color: var(--accent); transform: scale(1.03); }
+.preset.active .preset-thumb::after {
+  content: ''; position: absolute; top: 4px; right: 4px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center / 10px 10px no-repeat;
+}
+.preset-label {
+  font-size: 10px; color: var(--text-muted); line-height: 1.25;
+  word-break: keep-all; text-align: center;
+}
+.preset.active .preset-label { color: var(--accent); font-weight: 500; }
+
+/* ---------- 15. モーダル（app-modal共通枠） ---------- */
+.app-modal {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.app-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(30, 30, 64, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.app-modal-content {
+  position: relative;
+  background: var(--surface);
+  border-radius: 16px;
+  width: 90%; max-width: 360px;
+  box-shadow: 0 20px 60px rgba(30, 30, 64, 0.25);
+  animation: appModalIn 0.2s var(--easing);
+}
+.app-modal-content-narrow { max-width: 320px; }
+@keyframes appModalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+.app-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 16px 18px 0;
+}
+.app-modal-title { font-size: 14px; font-weight: 500; letter-spacing: 0.02em; }
+.app-modal-close {
+  position: relative;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: none;
+  color: var(--text-muted); border-radius: 50%;
+  transition: all 0.2s var(--easing);
+}
+.app-modal-close svg { width: 14px; height: 14px; }
+.app-modal-close::after { content: ''; position: absolute; inset: -8px; }  /* 44pxタップ確保 */
+.app-modal-body { padding: 12px 18px; font-size: 13px; color: var(--text-muted); line-height: 1.7; }
+.app-modal-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 0 18px 16px;
+}
+.app-modal-btn {
+  border: 1px solid var(--border-soft);
+  padding: 8px 18px; font-size: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface); color: var(--text-muted);
+  transition: all 0.2s var(--easing);
+}
+.app-modal-btn-primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+.app-modal-btn-danger  { background: #C84444; border-color: #C84444; color: #fff; }
+
+/* ---------- 16. トースト ---------- */
+.toast {
+  display: none; align-items: center; gap: 12px;
+  padding: 12px 14px 12px 18px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-card);
+  font-size: 13px;
+}
+.toast.visible { display: flex; }
+.toast.info { border-color: var(--accent-soft); color: var(--accent); }
+.toast.ok   { border-color: #B5D5BD; color: #2E5C3A; }
+.toast.err  { background: var(--danger); border-color: var(--danger); color: #fff; }
+.toast-text { flex: 1; min-width: 0; }
+.toast-close {
+  position: relative;
+  background: transparent; border: none; color: inherit;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0.7;
+}
+.toast-close::after { content: ''; position: absolute; inset: -11px; }  /* 44pxタップ確保 */
+.toast.floating {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  max-width: 480px; z-index: 95;
+  animation: toastIn 0.25s var(--easing);
+}
+@keyframes toastIn { from { opacity: 0; } }
+
+/* ---------- 17. モバイル/タブレット（構造変化は 899px に集約） ---------- */
+@media (max-width: 899px) {
+  /* タブバー高さぶんの逃げ */
+  body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+
+  /* sticky プレビュー（NOIRU §4: ネガマージンで全幅化 + 同色bg + blur + 下端フェード） */
+  .preview-section {
+    position: sticky; top: 0; z-index: 30;
+    margin: 0 -20px;
+    padding: 8px 20px 12px;
+    background: var(--bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .preview-section::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 12px;
+    background: linear-gradient(to bottom, transparent, rgba(247, 248, 252, 0.85));
+    pointer-events: none;
+  }
+  .stage { max-height: 34vh; }   /* sticky領域の圧縮（P4）: パネルの可視域を確保 */
+
+  /* ツールバー2段（表示切替等＋タイムライン）をモバイルでは詰める */
+  .preview-toolbar { gap: 6px 8px; margin-top: 8px; }
+  .preview-toolbar .option-btn { padding: 6px 8px; font-size: 10.5px; }
+  .preview-toolbar .motion-color-btn { padding-left: 20px; }  /* チェック風トグルは左padを維持（「再生」が切れない） */
+  .preview-toolbar .ba-btn { padding: 5px 14px; }
+  .preview-toolbar .slider-row { padding: 4px 0; }
+
+  /* rangeのタッチ拡大 */
+  input[type="range"] { height: 28px; }
+  input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8.5px; }
+  input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+
+  /* トーストは下部（タブバーの上）へ */
+  .toast.floating {
+    top: auto; bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    left: 16px; right: 16px; transform: none;
+    max-width: none; font-size: 11.5px;
+  }
+}
+
+/* ---------- 18. 密度調整のみ（640px。構造は触らない） ---------- */
+@media (max-width: 640px) {
+  .app-shell { padding: 20px 16px 28px; gap: var(--shell-gap-mobile); }
+  .preview-section { margin: 0 -16px; padding: 8px 16px 12px; }
+  .logo { font-size: 18px; }
+    .slider-row { grid-template-columns: 18px 92px 1fr 40px; }
+  .presets-list { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 12px 8px; }
+  .preset-label { font-size: 9.5px; }
+  .panel-section { padding: 14px 12px 16px; }
+}
+
+/* ---------- 19. hover はポインタ機器のみ ---------- */
+@media (hover: hover) {
+  .hero-icon-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-soft); }
+  .tab-btn:hover:not(:disabled):not(.active) { color: var(--accent); }
+  .tuning-group-head:hover:not(:disabled) { color: var(--text); }
+  .option-btn:hover:not(.active):not(:disabled) { background: var(--surface-hover); border-color: var(--accent-softer); }
+  .ba-btn:hover:not(.active) { color: var(--accent); }
+  .preset:hover .preset-thumb { border-color: var(--accent-soft); }
+  .app-modal-btn:hover { border-color: var(--accent-soft); color: var(--accent); }
+  .app-modal-btn-primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .app-modal-btn-danger:hover { background: #B83838; border-color: #B83838; color: #fff; }
+  .app-modal-close:hover { color: var(--text); background: var(--surface-2); }
+  .toast-close:hover { opacity: 1; }
+  .color-swatch:hover { border-color: var(--accent-soft); }
+}
+
+/* ---------- 20. reduced-motion: UIのトランジションのみ停止（.tl-* プレビューは対象外） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  button, .tab-icon, .tuning-group-body, .tuning-group-chevron,
+  .app-modal-content, .toast, .preset, .preset-thumb,
+  input[type="range"], .option-btn, .ba-btn, .hero-icon-btn {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------- 21. noscript ---------- */
+.noscript-note {
+  max-width: 480px;
+  margin: 40px auto;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  font-size: 13px; color: var(--text);
+  text-align: center; line-height: 1.8;
+}
+
+/* ========== デザインパネル（レイヤーリスト＆エディタ） ========== */
+/* panel-design.js が生成するUI。tuning-group と同じ静かなリスト作法 */
+.layer-list { display: flex; flex-direction: column; }
+.layer-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto 30px;
+  gap: 8px; align-items: center;
+  padding: 10px 6px; min-height: 40px;
+  border-top: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s var(--easing);
+}
+.layer-list .layer-row:first-child { border-top: none; }
+@media (hover: hover) {
+  .layer-row:hover { background: var(--surface-hover); }
+  .layer-row:hover .layer-row-name { color: var(--text); }
+}
+.layer-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.layer-row.selected { background: var(--accent-softer); }
+.layer-row.selected .layer-row-icon,
+.layer-row.selected .layer-row-name { color: var(--accent); }
+.layer-row.layer-hidden .layer-row-icon,
+.layer-row.layer-hidden .layer-row-name,
+.layer-row.layer-hidden .layer-row-meta { opacity: 0.4; }
+.layer-row-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.layer-row-icon svg { width: 15px; height: 15px; flex-shrink: 0; }
+.layer-row-name { font-size: 12.5px; font-weight: 500; color: var(--text); letter-spacing: 0.02em; white-space: nowrap; }
+.layer-row-meta { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.layer-row-eye {
+  position: relative;
+  width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 50%;
+  color: var(--text-muted); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.layer-row-eye::after { content: ''; position: absolute; inset: -7px; }  /* 44pxタップ確保 */
+.layer-row-eye svg { width: 15px; height: 15px; flex-shrink: 0; }
+.layer-row-eye:active { transform: scale(0.9); }
+.layer-row-eye:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* 選択レイヤーの編集ボディ（tuning-group.open と同じカード化） */
+.layer-editor {
+  padding: 10px 10px 12px;
+  margin: 0 -2px 4px;
+  background: var(--surface-2);
+  border-top: 1px dashed var(--border-soft);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+.layer-ops { display: flex; gap: 6px; margin-bottom: 10px; }
+.layer-op-btn {
+  position: relative;
+  width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer;
+  transition: all 0.15s var(--easing);
+  -webkit-tap-highlight-color: transparent;
+}
+.layer-op-btn::after { content: ''; position: absolute; inset: -7px; }
+.layer-op-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+@media (hover: hover) {
+  .layer-op-btn:hover:not(:disabled) { border-color: var(--accent-soft); color: var(--accent); }
+  .layer-op-btn.danger:hover:not(:disabled) { border-color: #c84444; color: #c84444; }
+}
+.layer-op-btn:active:not(:disabled) { transform: scale(0.92); }
+.layer-op-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.layer-op-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* ラベル付き行（セグメント/カラー） */
+.seg-row, .color-row, .metal-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.seg-row-label, .color-row-label {
+  flex: none; width: 58px;
+  font-size: 11.5px; color: var(--text-muted); letter-spacing: 0.02em; white-space: nowrap;
+}
+.seg-row .option-group { flex: 1; margin: 0; }
+.metal-row { margin-top: 4px; }
+.metal-btn, .stop-add, .shadow-add, .add-layer-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  flex: none; padding: 8px 14px;
+}
+.metal-btn { background: var(--accent-softer); color: var(--accent); border-color: var(--accent-soft); }
+.stop-add svg, .shadow-add svg, .add-layer-btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* グラデ停止リスト */
+.stop-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.stop-row {
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); padding: 6px 10px;
+}
+.stop-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stop-row .slider-row { padding: 2px 0 4px; grid-template-columns: 0 58px 1fr 44px; }
+
+/* レイヤー追加・ドロップシャドウ */
+.add-layer-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.add-layer-label { display: block; font-size: 11px; color: var(--text-muted); letter-spacing: 0.03em; margin-bottom: 8px; }
+.add-layer-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.shadow-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.shadow-card {
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md); padding: 8px 12px 10px;
+}
+.shadow-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.shadow-card-title { font-size: 11.5px; font-weight: 500; color: var(--text); letter-spacing: 0.02em; }
+
+/* ========== 書き出し（ヘッダーCTA＆モーダル） ========== */
+.hero-export-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 16px;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
+  box-shadow: 0 4px 14px rgba(52, 81, 255, 0.32);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s var(--easing);
+}
+.hero-export-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+@media (hover: hover) {
+  .hero-export-btn:hover { background: var(--accent-strong); transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(52, 81, 255, 0.42); }
+}
+.hero-export-btn:active { transform: translateY(0) scale(0.97); }
+.hero-export-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.export-modal-content { max-width: 480px; width: 92%; max-height: 86dvh; overflow-y: auto; }
+.export-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.export-card {
+  text-align: left; background: var(--surface);
+  border: 1.5px solid var(--border-soft); border-radius: var(--radius-md);
+  padding: 10px 14px; cursor: pointer;
+  transition: all 0.15s var(--easing); -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) { .export-card:hover:not(:disabled):not(.active) { border-color: var(--accent-softer); background: var(--surface-hover); } }
+.export-card.active { border-color: var(--accent); background: var(--accent-softer); }
+.export-card:disabled { opacity: 0.55; cursor: not-allowed; }
+.export-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.export-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.export-card-name { font-size: 13px; font-weight: 600; color: var(--text); letter-spacing: 0.02em; }
+.export-card-ext { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.export-card-badge {
+  margin-left: auto; padding: 1px 8px;
+  background: var(--accent-strong); color: #fbfafd;
+  font-size: 9.5px; font-weight: 500; letter-spacing: 0.05em; border-radius: 4px;
+}
+.export-card-desc { font-size: 11px; line-height: 1.55; color: var(--text-muted); }
+
+.export-settings { border-top: 1px solid var(--border-soft); padding-top: 6px; margin-bottom: 12px; }
+.export-summary {
+  margin-top: 6px; font-size: 11px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.03em;
+}
+.export-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.export-run {
+  width: 100%; padding: 13px;
+  background: var(--accent); color: #fff; border: none; border-radius: var(--radius-md);
+  font-size: 14px; font-weight: 600; letter-spacing: 0.05em;
+  box-shadow: 0 6px 20px rgba(52, 81, 255, 0.32);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s var(--easing);
+}
+@media (hover: hover) { .export-run:hover:not(:disabled) { background: var(--accent-strong); transform: translateY(-1px); } }
+.export-run:active:not(:disabled) { transform: translateY(0); }
+.export-run:disabled { background: var(--border); color: var(--text-dim); box-shadow: none; cursor: not-allowed; }
+.export-run:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.export-progress { margin-top: 14px; padding: 12px 14px; background: var(--surface-2); border-radius: var(--radius-md); }
+.export-progress-label { font-size: 12px; color: var(--text); line-height: 1.6; margin-bottom: 8px; letter-spacing: 0.02em; }
+.export-progress.done .export-progress-label { color: #2E5C3A; }
+.export-progress.fail .export-progress-label { color: #a03535; }
+.export-progress-bar { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+.export-progress-fill {
+  height: 100%; width: 0; background: var(--accent);
+  border-radius: 3px; transition: width 0.25s var(--easing);
+}
+.export-progress.done .export-progress-fill { background: #7FB08A; }
+.export-textarea {
+  width: 100%; margin: 4px 0 10px; padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; line-height: 1.5;
+  color: var(--text-muted); background: var(--surface);
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  resize: vertical;
+}
+.export-textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -1px; }
+@media (max-width: 640px) {
+  .hero-export-btn span { display: none; }               /* モバイルはアイコンのみ */
+  .hero-export-btn { padding: 8px 12px; }
+}
+
+/* ========== 汎用ドロップダウン（.ts-select。チップ列の代替＝認知負荷軽減） ========== */
+.ts-select { position: relative; display: block; width: 100%; }
+.ts-select-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 9px 12px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-size: 12.5px; letter-spacing: 0.02em; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s var(--easing);
+}
+@media (hover: hover) { .ts-select-btn:hover { border-color: var(--accent-soft); } }
+.ts-select-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ts-select-btn[aria-expanded="true"] { border-color: var(--accent); }
+.ts-select-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-select-chevron { display: inline-flex; color: var(--text-muted); }
+.ts-select-chevron svg { width: 14px; height: 14px; flex-shrink: 0; }
+.ts-select-panel {
+  max-height: 280px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md); padding: 5px;
+  box-shadow: 0 10px 34px rgba(30, 30, 64, 0.16);
+}
+.ts-select-group {
+  padding: 8px 9px 4px; font-size: 10px; color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+.ts-select-item {
+  display: flex; align-items: baseline; gap: 8px;
+  width: 100%; padding: 8px 9px;
+  background: transparent; border: none; border-radius: var(--radius-sm);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) { .ts-select-item:hover { background: var(--surface-hover); } }
+.ts-select-item.active { background: var(--accent-softer); }
+.ts-select-item.active .ts-select-item-label { color: var(--accent); font-weight: 500; }
+.ts-select-item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.ts-select-item-label { font-size: 12.5px; color: var(--text); white-space: nowrap; }
+.ts-select-desc { font-size: 10.5px; color: var(--text-dim); letter-spacing: 0.02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ========== Telopra 状態ルール追補（P4リブランド） ========== */
+/* 入力系フォーカス: Signal Cyan のリング（キーボードでも明確に） */
+input[type="text"]:focus, input[type="number"]:focus, textarea:focus, select:focus,
+input[type="text"]:focus-visible, input[type="number"]:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: var(--focus) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+@media (hover: hover) {
+  input[type="text"]:hover:not(:focus):not(:disabled),
+  input[type="number"]:hover:not(:focus):not(:disabled),
+  textarea:hover:not(:focus):not(:disabled) { border-color: var(--accent-soft); }
+}
+input:disabled, textarea:disabled {
+  background: var(--surface-2); color: var(--text-dim); border-color: var(--border-soft);
+}
+
+/* タイムライン（時刻スクラブ）= playhead。Signal Cyan で現在位置を示す */
+.timeline-row input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(var(--border-soft), var(--border-soft));
+  background-color: var(--surface-2);
+}
+.timeline-row input[type="range"]::-webkit-slider-thumb {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring), 0 1px 4px rgba(0, 213, 255, 0.35);
+}
+.timeline-row input[type="range"]::-moz-range-thumb {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring), 0 1px 4px rgba(0, 213, 255, 0.35);
+}
+.timeline-row .slider-value { color: var(--text); }
+
+/* 警告・注意（Telop Yellow: バッジ/注意書きに限定） */
+.warn-note, .export-card-note {
+  margin-top: 6px; padding: 5px 9px;
+  background: rgba(255, 216, 77, 0.24);
+  border: 1px solid rgba(255, 216, 77, 0.6);
+  border-radius: var(--radius-sm);
+  color: var(--text); font-size: 10.5px; line-height: 1.5;
+}
+
+/* 情報バッジ（青系） */
+.info-badge {
+  display: inline-block; padding: 1px 8px;
+  background: var(--accent-softer); color: var(--accent);
+  font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+  border-radius: var(--radius-pill);
+}
+
+/* ツールチップ的な強い面は Brand Ink（title属性以外で使う場合の共通クラス） */
+.ink-tip { background: var(--brand-ink); color: #fff; }
+
+/* Telopra ロゴ（ワードマークSVG）。高さは書き出しボタンに揃える */
+.logo { display: flex; align-items: center; }
+.logo-img { height: 34px; width: auto; display: block; }
+@media (max-width: 640px) { .logo-img { height: 28px; } }
+
+/* レイヤーのドラッグ入れ替え（panel-design） */
+.layer-row { touch-action: none; }             /* 縦ドラッグをスクロールに取られない */
+.layer-row.dragging {
+  position: relative; z-index: 5;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(30, 30, 64, 0.14);
+  opacity: 0.95;
+}
+.layer-row.drop-target { box-shadow: inset 0 0 0 2px var(--focus); border-radius: var(--radius-sm); }
+
+/* デザインパネルの節見出し余白（「ドロップシャドウ」等が上要素に密着しない） */
+.design-section + .design-section { margin-top: 26px; }
+.design-section .section-title { margin-bottom: 12px; }
+.design-section-shadows .section-title { padding-top: 18px; border-top: 1px solid var(--border-soft); }
