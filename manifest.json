@@ -1,0 +1,15 @@
+{
+  "name": "Telopra",
+  "short_name": "Telopra",
+  "description": "モーション付きテロップデザイン・ジェネレーター",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F7F8FC",
+  "theme_color": "#F7F8FC",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
