@@ -8,6 +8,9 @@
   window.TS = window.TS || {};
 
   var VENDOR = 'vendor/ffmpeg/';
+  // ffmpeg-core.js / .wasm は Cloudflare Pages の 25MiB 制限で同梱できないため CDN から読む。
+  // バージョンは同梱物と完全一致(0.12.10, md5一致)。CDNは application/wasm + CORS(*) を返す。
+  var CORE_CDN = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/';
   var _ffmpeg = null;       // ロード済みインスタンス（使い回し）
   var _loading = null;
 
@@ -46,7 +49,7 @@
     if (!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg) {
       return Promise.reject(new Error('ffmpeg.js が読み込まれていません（vendor/ffmpeg/ffmpeg.js）'));
     }
-    var base = new URL(VENDOR, document.baseURI).href;
+    var base = CORE_CDN;   // ← 同梱(vendor)ではなくCDNから core/wasm を取得
     _loading = Promise.all([
       fetchAsBlobURL(base + 'ffmpeg-core.js', 'text/javascript', null),
       fetchAsBlobURL(base + 'ffmpeg-core.wasm', 'application/wasm', onProgress)

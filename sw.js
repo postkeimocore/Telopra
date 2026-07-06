@@ -6,7 +6,7 @@
    - vendor（ffmpeg 約31MB）と Google Fonts: 初回アクセス時にキャッシュ（cache-first。以後オフラインでも書き出し可）。
    バージョンを上げると旧キャッシュは activate で破棄される。 */
 
-var VERSION = 'ts-v6';   // ← リリース時に上げる
+var VERSION = 'ts-v7';   // core/wasm を CDN(jsDelivr)化。旧キャッシュ破棄のため上げる   // ← リリース時に上げる
 var SHELL = 'shell-' + VERSION;
 var RUNTIME = 'runtime-' + VERSION;
 
@@ -54,6 +54,7 @@ self.addEventListener('fetch', function (e) {
   // 大物・外部（ffmpeg-core / Google Fonts）: cache-first（不変とみなす）
   var cacheFirst =
     url.pathname.indexOf('/vendor/ffmpeg/ffmpeg-core') >= 0 ||
+    (url.hostname === 'cdn.jsdelivr.net' && url.pathname.indexOf('@ffmpeg/core') >= 0) ||
     url.hostname === 'fonts.googleapis.com' ||
     url.hostname === 'fonts.gstatic.com';
   if (cacheFirst) {
