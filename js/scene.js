@@ -52,7 +52,10 @@
         out: null,
         stagger: { enabled: false, per: 'char', amount: 0.04 },
         hold: 2.55   // 旧appear+shineの周期3.0秒を保存（0.45+2.55）
-      }
+      },
+      // §1 配置: キャンバス中心からのオフセット(px)・全体スケール(倍率)・回転(deg)。
+      // DOM(.tl-wrap)/Canvas 両レンダラが同一合成順（translate→rotate→scale, 中心基準）で適用する。
+      transform: { x: 0, y: 0, scale: 1, rotate: 0 }
     };
   }
 
@@ -160,6 +163,12 @@
     });
     out.motion.stagger.per = /^(char|word|line)$/.test(out.motion.stagger.per) ? out.motion.stagger.per : 'char';
     out.motion.stagger.amount = num(out.motion.stagger.amount, 0.04);
+    // §1 配置 transform
+    var tf = (s.transform && typeof s.transform === 'object') ? s.transform : {};
+    out.transform = {
+      x: num(tf.x, 0), y: num(tf.y, 0),
+      scale: num(tf.scale, 1), rotate: num(tf.rotate, 0)
+    };
     return out;
   }
 

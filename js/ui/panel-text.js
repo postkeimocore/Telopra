@@ -99,12 +99,9 @@
     }
     return out;
   }
-  // content 変更時に runs を新長に収める（範囲外は除去・はみ出しはクランプ）
+  // §3-3 打ち替えでジャンプ率解除: 文言が変わったら runs を空にする（呼び出しは content変更時のみ）
   function clampRuns(draft) {
-    var len = (draft.text.content || '').length;
-    draft.text.runs = (draft.text.runs || [])
-      .filter(function (r) { return r && Array.isArray(r.range) && r.range[0] < len; })
-      .map(function (r) { return { range: [r.range[0], Math.min(r.range[1], len)], scale: r.scale }; });
+    draft.text.runs = [];
   }
 
   function mount(container) {
@@ -344,6 +341,7 @@
     }
 
     // ================= サイズ / 字間 / 行間 / 斜体角 =================
+    var D0 = TS.scene.create().text;   // §3-4 リセット既定値の単一ソース（create()）
     var sliderDefs = [];
     function makeSlider(def) {
       def.row = TS.ui.sliderRow({
@@ -354,7 +352,24 @@
         onCommit: function (v) { TS.store.set(function (d) { def.set(d, v); }); }
       });
       sliderDefs.push(def);
-      return def.row;
+      if (def.resetTo === undefined) return def.row;
+      // §3-4 この項目だけ初期化（range に input/change を発火させ通常経路で1履歴commit）
+      var wrap = el('div');
+      wrap.appendChild(def.row);
+      var rr = el('div', 'pt-skew-reset-row');
+      var rb = btn('pt-mini-btn');
+      rb.textContent = '初期化';
+      rb.setAttribute('aria-label', def.label + 'を初期値へ');
+      rb.addEventListener('click', function () {
+        var range = def.row.querySelector('input[type="range"]');
+        if (!range) return;
+        range.value = String(def.resetTo);
+        range.dispatchEvent(new Event('input'));
+        range.dispatchEvent(new Event('change'));
+      });
+      rr.appendChild(rb);
+      wrap.appendChild(rr);
+      return wrap;
     }
     function syncSliders(scene) {
       sliderDefs.forEach(function (d) {
@@ -370,43 +385,28 @@
     var slidersFld = el('div', 'pt-field');
     slidersFld.appendChild(makeSlider({
       icon: 'type', label: 'サイズ', min: 24, max: 400, step: 1, unit: 'px',
-      fmt: String,
+      fmt: String, resetTo: D0.size,
       get: function (s) { return s.text.size; },
       set: function (d, v) { d.text.size = v; }
     }));
     slidersFld.appendChild(makeSlider({
       icon: 'text-cursor', label: '字間', min: -0.05, max: 0.30, step: 0.005, unit: '',
-      fmt: function (v) { return v.toFixed(3); },
+      fmt: function (v) { return v.toFixed(3); }, resetTo: D0.letterSpacing,
       get: function (s) { return s.text.letterSpacing; },
       set: function (d, v) { d.text.letterSpacing = v; }
     }));
     slidersFld.appendChild(makeSlider({
       icon: 'layers', label: '行間', min: 0.8, max: 2.0, step: 0.05, unit: '',
-      fmt: function (v) { return v.toFixed(2); },
+      fmt: function (v) { return v.toFixed(2); }, resetTo: D0.lineHeight,
       get: function (s) { return s.text.lineHeight; },
       set: function (d, v) { d.text.lineHeight = v; }
     }));
-    var skewDef = {
+    slidersFld.appendChild(makeSlider({
       icon: 'sliders', label: '斜体角', min: -20, max: 20, step: 1, unit: '°',
-      fmt: String,
+      fmt: String, resetTo: D0.italicSkew,
       get: function (s) { return s.text.italicSkew; },
       set: function (d, v) { d.text.italicSkew = v; }
-    };
-    slidersFld.appendChild(makeSlider(skewDef));
-    // 斜体角の0リセット（rangeにinput/changeを発火させ通常経路で1履歴commit）
-    var resetRow = el('div', 'pt-skew-reset-row');
-    var resetBtn = btn('pt-mini-btn');
-    resetBtn.textContent = '0°リセット';
-    resetBtn.addEventListener('click', function () {
-      var range = skewDef.row.querySelector('input[type="range"]');
-      if (!range) return;
-      if (parseFloat(range.value) === 0 && (storeScene().text.italicSkew || 0) === 0) return;
-      range.value = '0';
-      range.dispatchEvent(new Event('input'));
-      range.dispatchEvent(new Event('change'));
-    });
-    resetRow.appendChild(resetBtn);
-    slidersFld.appendChild(resetRow);
+    }));
     container.appendChild(slidersFld);
 
     // ================= ジャンプ率（文字チップ複数選択 → 倍率 → runs生成） =================
@@ -419,7 +419,7 @@
     jumpHead.appendChild(jumpLbl);
     jumpHead.appendChild(clearBtn);
     var jumpHint = el('div', 'pt-hint');
-    jumpHint.textContent = '文字をタップして選択 → 倍率スライダーで調整';
+    jumpHint.textContent = '文字をタップして選択 → 倍率で付与。適用中(青枠)の文字をタップで解除';
     var chipsWrap = el('div', 'jump-chips');
 
     var selection = new Set();   // 選択中チップの開始インデックス（UIローカル）
@@ -463,6 +463,20 @@
     function onChipClick(ev) {
       var b = ev.currentTarget;
       var s = parseInt(b.dataset.s, 10);
+      // §3-1 付/外トグル: 適用中(has-run)の文字をタップ → その範囲を倍率1.0に戻して runs から外す
+      var t = storeScene().text;
+      var arr = scaleArr(t.content || '', t.runs);
+      if (s < arr.length && Math.round(arr[s] * 1000) / 1000 !== 1) {
+        var e = chipRanges[s] || (s + 1);
+        selection.delete(s);
+        TS.store.set(function (d) {
+          var a = scaleArr(d.text.content || '', d.text.runs);
+          for (var k = s; k < e && k < a.length; k++) a[k] = 1;
+          d.text.runs = compress(a);   // sync() が renderChips で再描画
+        });
+        return;
+      }
+      // 未適用: 従来どおり選択トグル（→ 倍率スライダーで付与）
       if (selection.has(s)) {
         selection.delete(s);
         b.classList.remove('selected');

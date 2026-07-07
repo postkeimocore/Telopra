@@ -130,6 +130,61 @@
         return { opacity: p <= 0 ? 0 : (j < 0.12 ? 0.35 : 1),
           dx: (j - 0.5) * 0.24 * P.I * env,
           hue: (j < 0.3 ? (j * 900) : 0) * env };
+      } },
+    // ---- v2 追加（§4 新モーション8種の土台となる in プリセット。dx/dy=em[basePx基準], rot=deg, blur=em） ----
+    { id: 'sink', name: '沈み込み', desc: '上からゆっくり沈む＋左右揺れ', intensity: true,
+      ev: function (e, p, P) {
+        // 上(-40px≈-0.25em)から easeOut で下降し定位置へ。着地までは減衰する左右揺れ(±15px≈0.094em→0)。
+        var sway = 0.094 * P.I * Math.sin(p * TAU * 1.5) * (1 - p) * (1 - p);
+        return { opacity: e, dy: -0.25 * P.I * (1 - e), dx: sway };
+      } },
+    { id: 'spinSlide', name: '回転スライド', desc: '横から回転しながら滑り込む', direction: true, intensity: true,
+      ev: function (e, p, P) {
+        // x=-200px(≈-1.25em)＋rotate-180°→0。停止する（オーバーシュートなし）。
+        return { opacity: clamp01(e * 2),
+          dx: P.vec[0] * 1.25 * P.I * (1 - e), dy: P.vec[1] * 1.25 * P.I * (1 - e),
+          rot: -180 * (1 - e) };
+      } },
+    { id: 'drift', name: 'ドリフト', desc: '高速滑走→オーバーシュート→戻る', direction: true, intensity: true, defaultEasing: 'backOut',
+      ev: function (e, p, P) {
+        // 大きめの距離(≈1.9em)＋backOut で x=-300→+20→0 のドリフト（戻り）。
+        return { opacity: clamp01(p * 3),
+          dx: P.vec[0] * 1.9 * P.I * (1 - e), dy: P.vec[1] * 1.9 * P.I * (1 - e) };
+      } },
+    { id: 'riseUp', name: 'せり上がり', desc: '下からゆっくり浮上（抜けない）', intensity: true,
+      ev: function (e, p, P) {
+        // y=+50px(≈0.31em)→0。slideup と違い停止（out 無し運用）。
+        return { opacity: e, dy: 0.31 * P.I * (1 - e) };
+      } },
+    { id: 'decode', name: 'デコード', desc: '乱れ→順次確定（文字ごと推奨）', intensity: true,
+      ev: function (e, p, P, ctx) {
+        // 量子化した擬似乱数で、確定前は明滅＋微ジッタ＋わずかなボケ。e=1 で完全確定。
+        // ※グリフ差し替えはエンジン対象外。既存プリミティブ(opacity/dx/blur)による近似＝決定的で書き出しも一致。
+        if (p <= 0) return { opacity: 0 };
+        var env = 1 - e;
+        var q = Math.floor(p * 12) + (ctx ? ctx.i * 7 : 0);
+        var j = Math.sin(q * 12.9898) * 43758.5453; j = j - Math.floor(j);
+        return { opacity: env > 0.05 ? (j < 0.35 ? 0.35 : 1) : 1,
+          dx: (j - 0.5) * 0.05 * P.I * env, blur: 0.14 * P.I * env };
+      } },
+    { id: 'swing', name: 'スイング', desc: '振り子状に揺れて定位置', intensity: true, defaultEasing: 'easeOut',
+      ev: function (e, p, P) {
+        // 上(-30px≈-0.19em)から入り、rotate±20°の減衰振動で静止（振り子）。
+        var damp = (1 - p) * (1 - p);
+        return { opacity: clamp01(p * 3), dy: -0.19 * P.I * (1 - e),
+          rot: 20 * P.I * Math.cos(p * TAU * 1.75) * damp };
+      } },
+    { id: 'zoomBlur', name: 'ズームブラー', desc: '大ボケ→縮小＋ピントで決まる', intensity: true, defaultEasing: 'easeOut',
+      ev: function (e, p, P) {
+        // scale1.6→1／blur(≈0.3em)→0／opacity0→1。決まったら静止（fuwafuwaと違い浮遊しない）。
+        return { opacity: clamp01(e * 2), s: 1 + 0.6 * P.I * (1 - e), blur: 0.3 * P.I * (1 - e) };
+      } },
+    { id: 'jelly', name: 'ゼリー伸縮', desc: 'ゴム状に伸縮して戻る', intensity: true, defaultEasing: 'easeOut',
+      ev: function (e, p, P) {
+        // sx/sy を逆位相で減衰オーバーシュート（体積保存風）。pop と別質感の弾性。
+        var amp = (1 - e) * P.I;
+        var w = Math.sin(p * TAU * 2);
+        return { opacity: clamp01(p * 4), sx: 1 + 0.5 * amp * w, sy: 1 - 0.4 * amp * w };
       } }
   ];
 

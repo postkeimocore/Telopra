@@ -1,0 +1,6 @@
+# Cloudflare Pages 配信ヘッダ（リポジトリ直下＝配信ルート）
+# sw.js 自体がキャッシュされると新デプロイを検知できないため必ず no-store。
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/index.html
+  Cache-Control: no-cache

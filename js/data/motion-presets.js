@@ -106,7 +106,35 @@
       motion: { in: { preset: 'flip', duration: 0.5, easing: 'backOut', intensity: 1 },
                 out: { preset: 'flipOut', duration: 0.35, easing: 'backIn', intensity: 1 },
                 loop: [],
-                stagger: { enabled: true, per: 'char', amount: 0.06 }, hold: 2.4 } }
+                stagger: { enabled: true, per: 'char', amount: 0.06 }, hold: 2.4 } },
+
+    // ---- v2 追加（§4）: 既存19種と動きが被らない8種 ----
+    { id: 'mp_sink', name: 'ゆらゆら沈む', desc: '上からゆっくり沈む＋左右揺れ。重く沈む＝悩み/共感向け', cat: '基本',
+      motion: { in: { preset: 'sink', duration: 0.9, easing: 'easeOut', intensity: 1 },
+                out: null, loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.6 } },
+    { id: 'mp_spin_slide', name: '回転スライド', desc: '横から回転しながらスライドインして停止', cat: '基本',
+      motion: { in: { preset: 'spinSlide', duration: 0.6, direction: 'left', easing: 'easeOut', intensity: 1 },
+                out: null, loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.4 } },
+    { id: 'mp_drift', name: 'ドリフトイン', desc: '横から高速滑走→オーバーシュート→戻る', cat: '強調',
+      motion: { in: { preset: 'drift', duration: 0.5, direction: 'left', easing: 'backOut', intensity: 1 },
+                out: { preset: 'fadeOut', duration: 0.3, easing: 'easeIn' },
+                loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.3 } },
+    { id: 'mp_riseup', name: 'せり上がり', desc: '下からゆっくり浮上＋フェードして停止。希望/情緒ピーク', cat: '基本',
+      motion: { in: { preset: 'riseUp', duration: 0.8, easing: 'easeOut', intensity: 1 },
+                out: null, loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.5 } },
+    { id: 'mp_decode', name: 'デコード', desc: '各文字がランダム風に乱れ→順次確定', cat: 'サイバー',
+      motion: { in: { preset: 'decode', duration: 0.8, easing: 'easeOut', intensity: 1 },
+                out: { preset: 'fadeOut', duration: 0.3, easing: 'easeIn' },
+                loop: [], stagger: { enabled: true, per: 'char', amount: 0.05 }, hold: 2.5 } },
+    { id: 'mp_swing', name: 'スイングイン', desc: '上から振り子状に回転振動して定位置', cat: '強調',
+      motion: { in: { preset: 'swing', duration: 0.9, easing: 'easeOut', intensity: 1 },
+                out: null, loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.5 } },
+    { id: 'mp_zoomblur', name: 'ズームブラー', desc: '大ボケ→縮小＋ピントで決まって静止', cat: '強調',
+      motion: { in: { preset: 'zoomBlur', duration: 0.5, easing: 'easeOut', intensity: 1 },
+                out: null, loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.5 } },
+    { id: 'mp_elastic', name: 'エラスティック', desc: 'ゴム状に伸縮して戻る弾性（popと別質感）', cat: '強調',
+      motion: { in: { preset: 'jelly', duration: 0.7, easing: 'easeOut', intensity: 1 },
+                out: null, loop: [], stagger: { enabled: false, per: 'char', amount: 0.04 }, hold: 2.5 } }
   ];
 
   g.TS.MOTION_PRESET_CATS = ['基本', '強調', 'パチンコ', 'サイバー', 'TikTok'];

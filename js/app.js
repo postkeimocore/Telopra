@@ -7,9 +7,9 @@
   // フェーズタブ定義（motion / my は準備中: disabled + バッジ）
   var TABS = [
     { id: 'text', label: 'テキスト' },
-    { id: 'presets', label: 'プリセット' },
     { id: 'design', label: 'デザイン' },
     { id: 'motion', label: 'モーション' },
+    { id: 'history', label: '保存履歴' },
     { id: 'my', label: 'Myプリセット' }
   ];
 
@@ -116,9 +116,12 @@
     var preview = mountInto(TS.uiPreview, '#tsPreviewSection');
     mountInto(TS.panelText, '#tsPanelText');
     mountInto(TS.panelDesign, '#tsPanelDesign');
-    mountInto(TS.panelPresets, '#tsPanelPresets');
     mountInto(TS.panelMotion, '#tsPanelMotion');
+    mountInto(TS.panelHistory, '#tsPanelHistory');
     mountInto(TS.panelMy, '#tsPanelMy');
+    mountInto(TS.uiProjectBar, '#tsProjectBar');   // 「まとめて作る」テロップ一覧（プロジェクト時のみ表示）
+    // §3-7: デザイン/モーションタブ先頭に「デザイン/モーションプリセット」節を差し込む（両パネルmount後に実行）
+    if (TS.panelPresets && typeof TS.panelPresets.mount === 'function') TS.panelPresets.mount();
 
     // 4) タブ・履歴・書き出しの配線
     wireTabs();
@@ -128,6 +131,11 @@
       var exporter = TS.uiExport.mount();
       exportBtn.addEventListener('click', function () { exporter.open(); });
     }
+    // 「まとめて作る」入口（IA_fix: 制作の入口。書き出しとは別）
+    var bulkBtn = document.getElementById('tsBulk');
+    if (bulkBtn && TS.uiBulk && typeof TS.uiBulk.open === 'function') {
+      bulkBtn.addEventListener('click', function () { TS.uiBulk.open(); });
+    }
 
     // 5) フォントロード完了後に再描画1回（Canvas計測をロード済みフォントで確定）
     if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
@@ -136,9 +144,27 @@
       });
     }
 
-    // 6) PWA: Service Worker 登録（http(s)のみ。file://では黙ってスキップ）
+    // 6) PWA: Service Worker 登録＋強制アップデート（http(s)のみ。file://では黙ってスキップ）
+    //    sw.js は install で skipWaiting()・activate で clients.claim() 済み。
+    //    新デプロイ検知→新SWが即 activate→controllerchange→リロードで最新版へ自動更新。
+    //    無限/余計なリロード防止: (a) 初回インストール(以前は未制御)の claim ではリロードしない、
+    //    (b) reloading フラグで二重リロードを防ぐ。
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-      navigator.serviceWorker.register('sw.js').catch(function () { /* 開発環境等の失敗は無視 */ });
+      var hadController = !!navigator.serviceWorker.controller; // 登録前に制御下だったか
+      var reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (reloading) return;
+        if (!hadController) return; // 初回インストールの claim では更新ではないのでリロードしない
+        reloading = true;
+        location.reload();
+      });
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        // 新SWのインストールを検知（statechange は監視のみ。activate は sw.js の skipWaiting に任せる）
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (nw) nw.addEventListener('statechange', function () { /* installed→activated は自動 */ });
+        });
+      }).catch(function () { /* 開発環境等の失敗は無視 */ });
     }
   }
 

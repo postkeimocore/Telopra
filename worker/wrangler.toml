@@ -1,0 +1,11 @@
+name = "telopra-cloud"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# KV ネームスペース（保存履歴の格納先）。
+# 手順:
+#   1) npx wrangler kv namespace create TELOPRA_KV
+#   2) 出力された id を下の "＜ここにKVのidを貼る＞" に貼り付け
+[[kv_namespaces]]
+binding = "TELOPRA_KV"
+id = "＜ここにKVのidを貼る＞"

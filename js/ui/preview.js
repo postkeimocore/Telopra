@@ -11,9 +11,10 @@
     { value: 'diff', label: '差分' }
   ];
   var RESOLUTIONS = [
-    { w: 1920, h: 1080, label: '1920×1080' },
-    { w: 1080, h: 1920, label: '1080×1920' },
-    { w: 1080, h: 1080, label: '1080×1080' }
+    { w: 1920, h: 1080, label: '16:9' },
+    { w: 1080, h: 1920, label: '9:16' },
+    { w: 1080, h: 1080, label: '1:1' },
+    { w: 1080, h: 1350, label: '4:5' }
   ];
   // 背景チップ用ミニチェッカー
   var CHIP_CHECKER = 'repeating-conic-gradient(#E9EBF0 0% 25%, #FFFFFF 0% 50%) 0 0 / 10px 10px';
@@ -55,12 +56,30 @@
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
     canvas.setAttribute('aria-hidden', 'true');
 
-    var guides = el('div', 'stage-guides hidden');
+    var guides = el('div', 'stage-guides hidden');   // セーフエリア枠＋中心十字はCSS（::before/::after）
+
+    // §1 配置ギズモ（移動/リサイズ/回転ハンドル。配置モード時のみ表示）
+    var gizmo = el('div', 'stage-gizmo hidden');
+    var gStem = el('div', 'gizmo-stem');
+    var gRot = el('div', 'gizmo-rot');
+    gizmo.appendChild(gStem);
+    gizmo.appendChild(gRot);
+    ['nw', 'ne', 'se', 'sw'].forEach(function (k) {
+      var hd = el('div', 'gizmo-h gizmo-' + k);
+      hd.dataset.corner = k;
+      gizmo.appendChild(hd);
+    });
+    // スナップガイド（中心へ吸着時のみ表示）
+    var snapV = el('div', 'snap-guide snap-v hidden');
+    var snapH = el('div', 'snap-guide snap-h hidden');
 
     stage.appendChild(bgEl);
     stage.appendChild(sceneBox);
     stage.appendChild(canvas);
     stage.appendChild(guides);
+    stage.appendChild(snapV);
+    stage.appendChild(snapH);
+    stage.appendChild(gizmo);
     wrap.appendChild(stage);
     container.appendChild(wrap);
 
@@ -338,12 +357,15 @@
     sliderRow.appendChild(sValue);
     sliderWrap.appendChild(sliderRow);
 
-    // 速度セグメント
+    // 速度セグメント（ラベル「速度」＋ 0.5/1/2/2.5×。「時刻」ラベルと対で並べる）
+    var speedLabel = el('span', 'slider-label');
+    speedLabel.textContent = '速度';
+    speedLabel.style.cssText = 'width:auto;flex:0 0 auto;';
     var speedWrap = el('div', 'option-group');
     speedWrap.style.cssText = 'margin:0;flex:0 0 auto;width:auto;';
     speedWrap.setAttribute('role', 'group');
     speedWrap.setAttribute('aria-label', '再生速度');
-    [[0.5, '0.5×'], [1, '1×'], [2, '2×']].forEach(function (sp) {
+    [[0.5, '0.5×'], [1, '1×'], [2, '2×'], [2.5, '2.5×']].forEach(function (sp) {
       var b = btn('option-btn');
       b.textContent = sp[1];
       b.style.flex = '0 0 auto';
@@ -359,6 +381,7 @@
       });
       speedWrap.appendChild(b);
     });
+    sliderWrap.appendChild(speedLabel);
     sliderWrap.appendChild(speedWrap);
 
     function syncSliderMax() {
@@ -372,7 +395,11 @@
 
     // ---- ツールバー組み立て ----
     var toolbar = el('div', 'preview-toolbar');
-    toolbar.appendChild(viewWrap);
+    // DOM/Canvas/差分 は内部の描画エンジン切替＝一般ユーザーには露出しない（用語が実装依存で混乱の元・DESIGN_RULES §2）。
+    // 通常は「プレビュー」1本＝DOM表示。書き出しは常にCanvas経路（見た目一致は維持）。開発時のみ ?debug=1 で切替を出す。
+    var showViewToggle = /[?&](debug|dev)=1/.test(location.search);
+    try { if (localStorage.getItem('tsDebug') === '1') showViewToggle = true; } catch (e) { /* noop */ }
+    if (showViewToggle) toolbar.appendChild(viewWrap);
     toolbar.appendChild(resWrap);
     toolbar.appendChild(bgWrap);
     toolbar.appendChild(guideBtn);
@@ -414,6 +441,179 @@
     onScene(TS.store.get());
     setView('dom');
     applyBg();
+
+    // ===== §1 配置（移動・リサイズ・回転・スナップ・数値入力） =====
+    var placeOn = true;   // 配置は常時有効（トグル廃止。数値入力＋ギズモを常に表示）
+    var SNAP = 14;   // 中心スナップ閾値（scene px）
+    function r2(n) { return Math.round(n * 100) / 100; }
+    function tf() { return TS.store.get().transform || { x: 0, y: 0, scale: 1, rotate: 0 }; }
+    function blockDims() {
+      try { var L = TS.layout.measure(TS.store.get()); return { w: L.block.w || 1, h: L.block.h || 1 }; }
+      catch (e) { return { w: 200, h: 100 }; }
+    }
+    function setTF(patch, transient) {
+      TS.store.set(function (d) {
+        d.transform = d.transform || { x: 0, y: 0, scale: 1, rotate: 0 };
+        for (var k in patch) d.transform[k] = patch[k];
+      }, { transient: !!transient });
+    }
+    function updateGizmo() {
+      if (!placeOn) { gizmo.classList.add('hidden'); return; }
+      var fit = fitScale();
+      if (!(fit > 0)) return;
+      gizmo.classList.remove('hidden');
+      var d = blockDims(), t = tf();
+      gizmo.style.width = (d.w * fit * t.scale) + 'px';
+      gizmo.style.height = (d.h * fit * t.scale) + 'px';
+      gizmo.style.transform = 'translate(-50%,-50%) translate(' + r2(t.x * fit) + 'px,' + r2(t.y * fit) +
+        'px) rotate(' + r2(t.rotate) + 'deg)';
+    }
+    function centerClient() {
+      var rc = stage.getBoundingClientRect(), fit = fitScale(), t = tf();
+      return { x: rc.left + rc.width / 2 + t.x * fit, y: rc.top + rc.height / 2 + t.y * fit, fit: fit || 1 };
+    }
+    function showSnap(v, h) {
+      snapV.classList.toggle('hidden', !v);
+      snapH.classList.toggle('hidden', !h);
+    }
+
+    var drag = null;
+    function onGizmoDown(e) {
+      if (!placeOn) return;
+      var corner = e.target && e.target.dataset && e.target.dataset.corner;
+      var isRot = e.target && e.target.classList && e.target.classList.contains('gizmo-rot');
+      var c = centerClient();
+      var t = tf();
+      var t0 = { x: t.x, y: t.y, scale: t.scale, rotate: t.rotate };
+      if (isRot) drag = { mode: 'rot', t0: t0, startAng: Math.atan2(e.clientY - c.y, e.clientX - c.x) };
+      else if (corner) drag = { mode: 'scale', t0: t0, startDist: Math.hypot(e.clientX - c.x, e.clientY - c.y) || 1 };
+      else drag = { mode: 'move', t0: t0, sx: e.clientX, sy: e.clientY };
+      window.addEventListener('pointermove', onWinMove, true);
+      window.addEventListener('pointerup', onWinUp, true);
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    function onWinMove(e) {
+      if (!drag) return;
+      if (drag.mode === 'move') {
+        var fit = fitScale() || 1;
+        var nx = drag.t0.x + (e.clientX - drag.sx) / fit;
+        var ny = drag.t0.y + (e.clientY - drag.sy) / fit;
+        var sv = Math.abs(nx) < SNAP, sh = Math.abs(ny) < SNAP;
+        if (sv) nx = 0;
+        if (sh) ny = 0;
+        showSnap(sv, sh);
+        setTF({ x: Math.round(nx), y: Math.round(ny) }, true);
+      } else if (drag.mode === 'scale') {
+        var c = centerClient();
+        var dist = Math.hypot(e.clientX - c.x, e.clientY - c.y);
+        var ns = Math.max(0.1, Math.min(8, drag.t0.scale * (dist / drag.startDist)));
+        setTF({ scale: Math.round(ns * 100) / 100 }, true);
+      } else if (drag.mode === 'rot') {
+        var c2 = centerClient();
+        var ang = Math.atan2(e.clientY - c2.y, e.clientX - c2.x);
+        var deg = drag.t0.rotate + (ang - drag.startAng) * 180 / Math.PI;
+        var snapped = Math.round(deg / 15) * 15;
+        if (Math.abs(deg - snapped) < 4) deg = snapped;   // 15°刻みへ吸着
+        deg = ((deg % 360) + 360) % 360; if (deg > 180) deg -= 360;
+        setTF({ rotate: Math.round(deg * 10) / 10 }, true);
+      }
+      updateGizmo();
+    }
+    function onWinUp() {
+      if (!drag) return;
+      drag = null;
+      showSnap(false, false);
+      TS.store.commit();
+      window.removeEventListener('pointermove', onWinMove, true);
+      window.removeEventListener('pointerup', onWinUp, true);
+    }
+    gizmo.addEventListener('pointerdown', onGizmoDown);
+
+    // ---- 配置コントロールバー（常時表示・プレビュー中央揃え。数値入力＋リセット。ドラッグ/ハンドルはプレビュー上のギズモ） ----
+    var placeBar = el('div', 'preview-place');
+    stage.classList.add('placing');
+    var placeFields = el('div', 'place-fields');
+    var placeLead = el('span', 'place-lead'); placeLead.textContent = '配置';   // 何の行か分かる先頭ラベル
+    placeBar.appendChild(placeLead);
+    var inputs = {};
+    function numField(key, label, getV, setV, step, suffix) {
+      var f = el('div', 'place-field');
+      var lbl = el('span', 'place-field-label'); lbl.textContent = label;   // el()は(tag,cls)のみ＝textはtextContentで設定
+      f.appendChild(lbl);
+      var inp = el('input');
+      inp.type = 'number';
+      inp.step = String(step || 1);
+      inp.className = 'place-input';
+      inp.value = String(getV());
+      inp.addEventListener('input', function () {
+        var v = parseFloat(inp.value);
+        if (isFinite(v)) setV(v);
+      });
+      inp.addEventListener('change', function () { TS.store.commit(); });
+      f.appendChild(inp);
+      if (suffix) { var sfx = el('span', 'place-field-suffix'); sfx.textContent = suffix; f.appendChild(sfx); }
+      inputs[key] = inp;
+      placeFields.appendChild(f);
+    }
+    numField('x', 'X', function () { return Math.round(tf().x); }, function (v) { setTF({ x: Math.round(v) }, true); }, 1);
+    numField('y', 'Y', function () { return Math.round(tf().y); }, function (v) { setTF({ y: Math.round(v) }, true); }, 1);
+    numField('scale', '拡大', function () { return Math.round(tf().scale * 100); }, function (v) { setTF({ scale: Math.max(0.1, v / 100) }, true); }, 1, '%');
+    numField('rotate', '回転', function () { return Math.round(tf().rotate); }, function (v) { setTF({ rotate: v }, true); }, 1, '°');
+    var resetBtn = btn('place-reset');
+    resetBtn.textContent = 'リセット';
+    resetBtn.addEventListener('click', function () { setTF({ x: 0, y: 0, scale: 1, rotate: 0 }, false); });
+    placeFields.appendChild(resetBtn);
+    placeBar.appendChild(placeFields);
+    container.appendChild(placeBar);
+
+    function syncPlaceInputs() {
+      if (drag) return;   // 操作中は書き戻さない
+      var t = tf();
+      if (inputs.x) inputs.x.value = String(Math.round(t.x));
+      if (inputs.y) inputs.y.value = String(Math.round(t.y));
+      if (inputs.scale) inputs.scale.value = String(Math.round(t.scale * 100));
+      if (inputs.rotate) inputs.rotate.value = String(Math.round(t.rotate));
+    }
+
+    // シーン変更・リサイズでギズモと数値を追従
+    TS.store.subscribe(function () { updateGizmo(); syncPlaceInputs(); });
+    if (typeof ResizeObserver === 'function') new ResizeObserver(updateGizmo).observe(stage);
+    syncPlaceInputs();
+
+    // ===== §3-10 スマホ: 下スクロールで操作帯を収納（PCは常時表示）。
+    //   収納は高さを畳む→ページ高が変わり scroll が再発火し、以前は付け外しが往復して「パカパカ／勝手に復帰」した。
+    //   対策: (a)状態フラグで無駄な切替を止める (b)トグル直後は一定時間 scroll 判定をロックしレイアウト変化由来の
+    //   スクロールを無視する（フィードバック発振を断つ） (c)10pxのヒステリシス。=====
+    var mqMobile = window.matchMedia('(max-width: 899px)');
+    var lastScrollY = 0, scrollTick = false, toolbarHidden = false, lockUntil = 0;
+    function setToolbarHidden(hide) {
+      if (hide === toolbarHidden) return;
+      toolbarHidden = hide;
+      if (hide) document.body.setAttribute('data-toolbar-hidden', '');
+      else document.body.removeAttribute('data-toolbar-hidden');
+      lockUntil = performance.now() + 450;   // 収納/復帰トランジション中は再判定しない
+    }
+    function evalToolbar() {
+      scrollTick = false;
+      if (!mqMobile.matches) { setToolbarHidden(false); return; }
+      var y = Math.max(0, window.scrollY || window.pageYOffset || 0);
+      if (performance.now() < lockUntil) { lastScrollY = y; return; }  // トグル直後のレイアウト変化を無視
+      if (scrubbing) { lastScrollY = y; return; }                      // スクラブ中は隠さない
+      if (y <= 48) { setToolbarHidden(false); lastScrollY = y; return; } // 最上部付近は常に表示
+      var dy = y - lastScrollY;
+      if (dy > 10) setToolbarHidden(true);          // はっきり下スクロール → 収納
+      else if (dy < -10) setToolbarHidden(false);   // はっきり上スクロール → 復帰
+      lastScrollY = y;
+    }
+    window.addEventListener('scroll', function () {
+      if (scrollTick) return;
+      scrollTick = true;
+      requestAnimationFrame(evalToolbar);
+    }, { passive: true });
+    if (mqMobile.addEventListener) {
+      mqMobile.addEventListener('change', function () { if (!mqMobile.matches) setToolbarHidden(false); });
+    }
 
     return {
       el: wrap,

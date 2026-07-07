@@ -336,9 +336,16 @@
     }
 
     ctx.save();
-    // 変換合成: デバイス → キャンバス中心へブロック中心 → skewX → （blockモーション変形）→ ブロックローカル
+    // 変換合成: デバイス → キャンバス中心へ → §1配置transform → skewX → （blockモーション変形）→ ブロックローカル
     ctx.setTransform(scale, 0, 0, scale, dx, dy);
     ctx.translate(scene.canvas.w / 2, scene.canvas.h / 2);
+    // §1 配置transform（キャンバス中心基準。順序 translate→rotate→scale。DOMの .tl-wrap と一致）
+    var utf = scene.transform;
+    if (utf) {
+      if (utf.x || utf.y) ctx.translate(utf.x || 0, utf.y || 0);
+      if (utf.rotate) ctx.rotate(utf.rotate * Math.PI / 180);
+      if (utf.scale != null && utf.scale !== 1) ctx.scale(utf.scale, utf.scale);
+    }
     var skewDeg = (scene.text && scene.text.italicSkew) || 0;
     if (skewDeg) ctx.transform(1, 0, Math.tan(skewDeg * Math.PI / 180), 1, 0, 0);
     ctx.translate(-W / 2, -H / 2);
@@ -351,7 +358,10 @@
       var b = F.basePx, cx = W / 2, cy = H / 2;
       ctx.translate(cx + blockProps.dx * b, cy + blockProps.dy * b);
       if (blockProps.rot) ctx.rotate(blockProps.rot * Math.PI / 180);
-      if (blockProps.s !== 1) ctx.scale(blockProps.s, blockProps.s);
+      // 軸別スケール(sx/sy)も適用（flip/flipOut/jelly等。DOMのtransformOf・charモードのunitTransformと一致）
+      var bsx = blockProps.s * (blockProps.sx == null ? 1 : blockProps.sx);
+      var bsy = blockProps.s * (blockProps.sy == null ? 1 : blockProps.sy);
+      if (bsx !== 1 || bsy !== 1) ctx.scale(bsx, bsy);
       ctx.translate(-cx, -cy);
     }
     F.deviceScale = scale;

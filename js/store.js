@@ -51,6 +51,17 @@
     notify({ transient: transient });
   }
 
+  // シーンを載せ替え、履歴をそのシーンで作り直す（プロジェクトのテロップ切替用）。
+  // 通常の set と違い履歴を積まずリセットするため、テロップを跨いだ undo（=別テロップの内容が
+  // 現テロップに混入し saveCurrent で誤上書き＝データ喪失）を構造的に防ぐ。notify で全UI再描画。
+  function load(scene) {
+    current = TS.scene.normalize(scene || TS.scene.create());
+    history = [clone(current)];
+    index = 0;
+    transientActive = false;
+    notify({ transient: false });
+  }
+
   // transient 連続変更を1履歴に確定（label は将来のUI表示用。現状未使用）
   function commit(label) {
     void label;
@@ -97,6 +108,7 @@
     init: init,
     get: get,
     set: set,
+    load: load,
     commit: commit,
     subscribe: subscribe,
     undo: undo,

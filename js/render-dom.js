@@ -184,9 +184,15 @@
           });
         }
 
-        // 斜体（skewはwrap。outクリップもwrapに載る）
+        // 斜体（skewはwrap。outクリップもwrapに載る）＋ §1配置transform（Canvasと同一合成順）
         var skew = text.italicSkew || 0;
-        el.style.transform = skew ? 'skewX(' + fmt(skew) + 'deg)' : '';
+        var utf = scene.transform || {};
+        var uStr = '';
+        if (utf.x || utf.y) uStr += 'translate(' + fmt(utf.x || 0) + 'px,' + fmt(utf.y || 0) + 'px)';
+        if (utf.rotate) uStr += ' rotate(' + fmt(utf.rotate) + 'deg)';
+        if (utf.scale != null && utf.scale !== 1) uStr += ' scale(' + fmt(utf.scale) + ')';
+        if (skew) uStr += ' skewX(' + fmt(skew) + 'deg)';
+        el.style.transform = uStr.trim();
         el.style.clipPath = '';
 
         var metal = document.createElement('div');

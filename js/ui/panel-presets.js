@@ -13,8 +13,9 @@
       'margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--border-soft);}' +
     '.preset-cat-label:first-of-type{margin-top:4px;padding-top:0;border-top:none;}' +
     /* プリセット節はグリッドが縦に長い → アコーディオン開時のmax-height制限を実質解除 */
-    '#tsPanelPresets .tuning-group.open .tuning-group-body{max-height:20000px;}' +
-    '#tsPanelPresets .tuning-group{margin-top:2px;}';
+    '.preset-section .tuning-group.open .tuning-group-body{max-height:20000px;}' +
+    '.preset-section .tuning-group{margin-top:2px;}' +
+    '.preset-section{margin-bottom:8px;}';
 
   var FIT_W = 88, FIT_H = 52;  // サムネ箱の実測不能時フォールバック(px)
   var THUMB_SIZE = 60;         // サムネ文字サイズpx
@@ -54,7 +55,8 @@
       return s || TS.scene.create();
     }
     function isVisible() {
-      return document.body.getAttribute('data-active-tab') === 'presets';
+      var t = document.body.getAttribute('data-active-tab');
+      return t === 'design' || t === 'motion';   // §3-7: プリセット節はデザイン/モーションタブ先頭に移設
     }
 
     /* ==== 遅延描画IO（デザイン・モーション共用。画面内カードだけ処理） ==== */
@@ -245,25 +247,24 @@
       });
     }
 
-    /* ==== 組み立て（見出し＋アコーディオン2節） ==== */
-    var title = el('h2', 'section-title');
-    title.textContent = 'プリセット';
-    container.appendChild(title);
+    /* ==== 組み立て（§3-7: デザインタブ先頭に「デザインプリセット」/モーションタブ先頭に「モーションプリセット」を差し込む） ==== */
+    var designHost = document.getElementById('tsPanelDesign');
+    var motionHost = document.getElementById('tsPanelMotion');
     var designBody = buildDesignBody();
     var mpBody = buildMpBody();
-    container.appendChild(TS.ui.group({
-      icon: 'grid',
-      title: 'デザインプリセット・' + TS.PRESETS.length + '種',
-      open: true,
-      body: designBody
-    }));
-    if (mpCards.length) {
-      container.appendChild(TS.ui.group({
-        icon: 'play',
-        title: 'モーションプリセット・' + (TS.MOTION_PRESETS || []).length + '種',
-        open: true,
-        body: mpBody
+    if (designHost) {
+      var dWrap = el('div', 'preset-section');
+      dWrap.appendChild(TS.ui.group({
+        icon: 'grid', title: 'デザインプリセット・' + TS.PRESETS.length + '種', open: false, body: designBody
       }));
+      designHost.insertBefore(dWrap, designHost.firstChild);
+    }
+    if (motionHost && mpCards.length) {
+      var mWrap = el('div', 'preset-section');
+      mWrap.appendChild(TS.ui.group({
+        icon: 'play', title: 'モーションプリセット・' + (TS.MOTION_PRESETS || []).length + '種', open: false, body: mpBody
+      }));
+      motionHost.insertBefore(mWrap, motionHost.firstChild);
     }
 
     /* ==== 再描画まわり ==== */
@@ -324,7 +325,7 @@
 
     drawAllVisible();
     raf = requestAnimationFrame(tick);
-    return { el: container };
+    return { el: null };
   }
 
   TS.panelPresets = { mount: mount };

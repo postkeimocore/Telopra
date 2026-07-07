@@ -6,9 +6,11 @@
    - vendor（ffmpeg 約31MB）と Google Fonts: 初回アクセス時にキャッシュ（cache-first。以後オフラインでも書き出し可）。
    バージョンを上げると旧キャッシュは activate で破棄される。 */
 
-var VERSION = 'ts-v7';   // core/wasm を CDN(jsDelivr)化。旧キャッシュ破棄のため上げる   // ← リリース時に上げる
+var VERSION = 'ts-v9';   // v2＋IA修正（まとめて作る=プロジェクト）。SHELL構成変更のため上げる   // ← リリース時に上げる
 var SHELL = 'shell-' + VERSION;
-var RUNTIME = 'runtime-' + VERSION;
+// RUNTIME は VERSION 非依存の固定名。ここに入るのは不変アセット（ffmpeg-core≈31MB・Google Fonts）なので、
+// VERSION を上げてもオフライン再ダウンロードが起きないよう活性化時に破棄しない（保護対象）。
+var RUNTIME = 'runtime-v1';
 
 var SHELL_FILES = [
   './',
@@ -18,15 +20,16 @@ var SHELL_FILES = [
   'assets/icon-192.png',
   'assets/icon-512.png',
   'assets/logo.svg', 'assets/favicon.svg', 'assets/apple-touch-icon.png',
-  'js/color.js', 'js/anim.js', 'js/motion.js', 'js/scene.js', 'js/layout.js', 'js/store.js',
+  'js/color.js', 'js/anim.js', 'js/motion.js', 'js/scene.js', 'js/layout.js', 'js/store.js', 'js/project.js',
   'js/data/fonts.js', 'js/data/presets.js', 'js/data/motion-presets.js',
-  'js/render-dom.js', 'js/render-canvas.js',
+  'js/render-dom.js', 'js/render-canvas.js', 'js/cloud.js',
   'js/ui/controls.js', 'js/ui/preview.js', 'js/ui/panel-text.js', 'js/ui/panel-design.js',
-  'js/ui/panel-presets.js', 'js/ui/panel-motion.js', 'js/ui/panel-my.js',
+  'js/ui/panel-presets.js', 'js/ui/panel-motion.js', 'js/ui/panel-my.js', 'js/ui/panel-history.js',
   'js/export/zip.js', 'js/export/gif.js', 'js/export/frames.js', 'js/export/movie.js', 'js/export/css.js',
-  'js/export/lottie.js',
-  'js/ui/export-modal.js', 'js/app.js',
-  'vendor/ffmpeg/ffmpeg.js', 'vendor/ffmpeg/814.ffmpeg.js'
+  'js/export/lottie.js', 'js/export/apng.js', 'js/export/readme.js',
+  'js/ui/export-modal.js', 'js/ui/script-modal.js', 'js/ui/project-bar.js', 'js/ui/bulk-entry.js', 'js/app.js',
+  'vendor/ffmpeg/ffmpeg.js', 'vendor/ffmpeg/814.ffmpeg.js',
+  'vendor/upng/pako.min.js', 'vendor/upng/UPNG.min.js'
 ];
 
 self.addEventListener('install', function (e) {
@@ -76,8 +79,11 @@ self.addEventListener('fetch', function (e) {
   if (url.origin === location.origin) {
     e.respondWith(
       fetch(req).then(function (res) {
-        var copy = res.clone();
-        caches.open(SHELL).then(function (c) { c.put(req, copy); });
+        // 200のみキャッシュ（404/500/503のエラーHTMLを焼き込むとオフライン時に起動不能になるため）
+        if (res && res.status === 200 && res.type !== 'opaque') {
+          var copy = res.clone();
+          caches.open(SHELL).then(function (c) { c.put(req, copy); });
+        }
         return res;
       }).catch(function () {
         return caches.match(req, { ignoreSearch: true });
